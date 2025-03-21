@@ -19,7 +19,7 @@ func main() {
 
 	routes.SetUpRoutes(app)
 
-	err := app.Listen(":3030")
+	err := app.Listen(":8000")
 	if err != nil {
 		log.Fatalf("error in run api server, error = %v \n", err)
 	}
