@@ -3,6 +3,7 @@ package controllers
 import (
 	"main/database"
 	"main/models"
+	"main/worker"
 	"net/http"
 	"time"
 
@@ -10,23 +11,35 @@ import (
 )
 
 func CreateConfig(c *fiber.Ctx) error {
-	config := new(models.CommandLineConfig)
-	if err := c.BodyParser(config); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "wrong format"})
+	var config models.CommandLineConfig
+	if err := c.BodyParser(&config); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	if config.Name == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Name must be provided"})
+	}
+
+	if config.Command == "" {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Command must be provided"})
 	}
 
 	if config.Limit == 0 {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "limit can not be 0"})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Limit must be greater than 0"})
 	}
 
 	if config.Interval == 0 {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "interval can not be 0"})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Interval must be greater than 0"})
 	}
 
-	config.Interval = config.Interval * int(time.Hour)
-	database.DB.Create(config)
-	c.Status(http.StatusOK).JSON(fiber.Map{"message": "config created successfully"})
-	return c.Status(http.StatusOK).JSON(fiber.Map{"message": "new user created successfully"})
+	config.Interval = int(time.Duration(config.Interval) * time.Second)
+
+	if err := database.DB.Create(&config).Error; err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create config"})
+	}
+
+	worker.ConfigChannel <- config
+	return c.JSON(config)
 }
 
 func GetConfigs(c *fiber.Ctx) error {
@@ -48,24 +61,24 @@ func GetConfig(c *fiber.Ctx) error {
 func UpdateConfig(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var config models.CommandLineConfig
-	if result := database.DB.First(&config, id); result.Error != nil {
-		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "congig not found"})
+	if err := database.DB.First(&config, id).Error; err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "Command not found"})
 	}
 
 	if err := c.BodyParser(&config); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "wrong format"})
-	}
-
-	if config.Limit == 0 {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "limited reached"})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
 	}
 
 	if config.Limit > 0 {
 		config.Limit--
 	}
 
-	database.DB.Save(&config)
-	c.Status(http.StatusOK).JSON(fiber.Map{"message": "config updated successfully"})
+	config.Interval = 30
+	if err := database.DB.Save(&config).Error; err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update command"})
+	}
+
+	worker.ConfigChannel <- config
 	return c.JSON(config)
 }
 

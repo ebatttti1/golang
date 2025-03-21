@@ -5,6 +5,7 @@ import (
 	"main/database"
 	"main/models"
 	"main/routes"
+	"main/worker"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -13,6 +14,8 @@ func main() {
 	database.ConnectDatabase()
 	database.DB.AutoMigrate(&models.CommandLineConfig{})
 	app := fiber.New()
+
+	worker.StartWorker()
 
 	routes.SetUpRoutes(app)
 
