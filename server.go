@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"main/database"
+	"main/models"
 	"main/routes"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,7 +11,7 @@ import (
 
 func main() {
 	database.ConnectDatabase()
-
+	database.DB.AutoMigrate(&models.CommandLineConfig{})
 	app := fiber.New()
 
 	routes.SetUpRoutes(app)

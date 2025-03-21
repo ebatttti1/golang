@@ -1,48 +1,24 @@
 package database
 
-import(
-	"database/sql"
+import (
 	"fmt"
 	"log"
-	"os"
-
-	"github.com/joho/godotenv"
+	
+	"gorm.io/gorm"
+	"gorm.io/driver/postgres"
 )
 
-var DB *sql.DB
+var DB *gorm.DB
 
 func ConnectDatabase() {
-	err := godotenv.Load()
+	dsn := `host=localhost user=postgres password=1
+	dbname=users port=5432 sslmode=disable TimeZone=Asia/Tehran`
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("error in connect database, error = %v \n", err)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("SSL_MODE"),
-	)
-
-	DB, err := sql.Open("users", dsn)
-	if err != nil {
-		log.Fatal("error in connecting to database:", err)
-	}
-
-	err = DB.Ping()
-	if err != nil {
-		log.Fatal("error in connecting to database:", err)
-	}
-
-	fmt.Println("Connected to database")
+	DB = db
+	fmt.Println("connect database successfully")
 }
-
-
-
-
-
-
-
-

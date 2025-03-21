@@ -1,79 +1,76 @@
 package controllers
 
 import (
-	"database/sql"
-	"log"
 	"main/database"
 	"main/models"
+	"net/http"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
-func CreateUser(c *fiber.Ctx) error {
-	user := new(models.User)
-	if err := c.BodyParser(user); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "wrong format"})
+
+func CreateConfig(c *fiber.Ctx) error {
+	config := new(models.CommandLineConfig)
+	if err := c.BodyParser(config); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "wrong format"})
 	}
 
-	_, err := database.DB.Exec("INSERT INTO users (name, email) VALUES ($1, $2)", user.Username, user.Email)
-	if err != nil {
-		log.Println("error to add user:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "there is an error to create new user"})
+	if config.Limit == 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "limit can not be 0"})
 	}
-	
-	return c.Status(201).JSON(fiber.Map{"message": "new user created successfully"})
+
+	if config.Interval == 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "interval can not be 0"})
+	}
+
+	config.Interval = config.Interval * int(time.Hour)
+	database.DB.Create(config)
+	c.Status(http.StatusOK).JSON(fiber.Map{"message": "config created successfully"})
+	return c.Status(http.StatusOK).JSON(fiber.Map{"message": "new user created successfully"})
 }
 
-func GetUsers(c *fiber.Ctx) error {
-	rows, err := database.DB.Query("SELECT id, name, email FROM users")
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "error to get users"})
-	}
-	defer rows.Close()
-	var users []models.User
-	for rows.Next() {
-		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "error to read users data"})
-		}
-		users = append(users, user)
-	}
-	return c.JSON(users)
+func GetConfigs(c *fiber.Ctx) error {
+	var configs []models.CommandLineConfig
+	database.DB.Find(&configs)
+	return c.JSON(configs)
 }
 
-func GetUser(c *fiber.Ctx) error {
+func GetConfig(c *fiber.Ctx) error {
 	id := c.Params("id")
-	var user models.User
-	err := database.DB.QueryRow("SELECT id, name, email FROM users WHERE id=$1", id).Scan(&user.ID, &user.Username, &user.Email)
-	if err == sql.ErrNoRows {
-		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
-		} else if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "error to receive users data"})
-		}
+	var config models.CommandLineConfig
+	if result := database.DB.First(&config, id); result.Error != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
 
-	return c.JSON(user)
+	return c.JSON(config)
 }
 
-func UpdateUser(c *fiber.Ctx) error {
+func UpdateConfig(c *fiber.Ctx) error {
 	id := c.Params("id")
-	user := new(models.User)
-	if err := c.BodyParser(user); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "data format is wrong"})
+	var config models.CommandLineConfig
+	if result := database.DB.First(&config, id); result.Error != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "congig not found"})
 	}
 
-	_, err := database.DB.Exec("UPDATE users SET name=$1, email=$2 WHERE id=$3", user.Username, user.Email, id)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "error to update user"})
+	if err := c.BodyParser(&config); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "wrong format"})
 	}
 
-	return c.JSON(fiber.Map{"message": "user updated successfully"})
+	if config.Limit == 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "limited reached"})
+	}
+
+	if config.Limit > 0 {
+		config.Limit--
+	}
+
+	database.DB.Save(&config)
+	c.Status(http.StatusOK).JSON(fiber.Map{"message": "config updated successfully"})
+	return c.JSON(config)
 }
 
-func DeleteUser(c *fiber.Ctx) error {
+func DeleteConfig(c *fiber.Ctx) error {
 	id := c.Params("id")
-	_, err := database.DB.Exec("DELETE FROM users WHERE id=$1", id)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "error to delete user"})
-	}
-
-	return c.JSON(fiber.Map{"message": "user deleted successfully"})
+	database.DB.Delete(&models.CommandLineConfig{}, id)
+	return c.JSON(fiber.Map{"message": "config deleted deleted successfully"})
 }
