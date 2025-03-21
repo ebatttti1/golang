@@ -22,3 +22,7 @@ func ConnectDatabase() {
 	DB = db
 	fmt.Println("connect database successfully")
 }
+
+func GetDB() *gorm.DB {
+	return DB
+}

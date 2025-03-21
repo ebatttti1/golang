@@ -12,15 +12,22 @@ import (
 
 func main() {
 	database.ConnectDatabase()
-	database.DB.AutoMigrate(&models.CommandLineConfig{})
+	db := database.GetDB()
+
+	//database.DB.AutoMigrate(&models.CommandLineConfig{})
+	var tasks []models.CommandLineConfig
+	db.Find(&tasks)
+	for _, task := range tasks {
+		go worker.ProcessConfig(db, task)
+	}
+	//select{}
+
 	app := fiber.New()
-
-	worker.StartWorker()
-
 	routes.SetUpRoutes(app)
-
-	err := app.Listen(":8000")
+	err := app.Listen(":3030")
 	if err != nil {
 		log.Fatalf("error in run api server, error = %v \n", err)
 	}
+
+	select{}
 }

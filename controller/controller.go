@@ -13,6 +13,7 @@ import (
 
 func CreateConfig(c *fiber.Ctx) error {
 	var config models.CommandLineConfig
+
 	if err := c.BodyParser(&config); err != nil {
 		log.Fatalf("error in parse body, error = %v \n", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
